@@ -12,19 +12,33 @@
 
 ---
 
-## วิธีการใช้งานระบบ (Quick Start)
+## ขั้นตอนการติดตั้งและการใช้งานจาก Root Folder (ไม่ต้อง cd)
 
-### 1. เปิดใช้งานบริการ Camera Streamer
-เปิด Git Bash และพิมพ์คำสั่งดังนี้เพื่อรัน Flask Service บนพอร์ต 5000:
+### 1. บริการ Web Speaker (Next.js)
+ติดตั้งและรันจาก Root ด้วยคำสั่ง:
 ```bash
-# เปิด venv และรันโปรแกรม
-source camera-streamer/venv/Scripts/activate
-python camera-streamer/main.py
-```
-*ตัวสตรีมจะทำงานที่ http://localhost:5000/api/video_feed*
+# ติดตั้ง dependencies
+pnpm --prefix web-speaker install
 
-### 2. เปิดใช้งานระบบตรวจจับมือ (Hand Detection)
-เปิด Git Bash อีกหน้าต่างหนึ่ง แล้วพิมพ์คำสั่ง:
+# รันโหมดพัฒนา (Development)
+pnpm --prefix web-speaker dev
+```
+
+### 2. บริการ Camera Streamer (Python Flask)
+ติดตั้ง dependencies และรันจาก Root ด้วยคำสั่ง:
+```bash
+# สร้าง virtual environment (ถ้ายังไม่มี)
+python -m venv camera-streamer/venv
+
+# ติดตั้ง dependencies
+camera-streamer/venv/Scripts/pip install -r camera-streamer/requirements.txt
+
+# รัน Flask Service (รันบนพอร์ต 5000)
+camera-streamer/venv/Scripts/python camera-streamer/main.py
+```
+
+### 3. บริการตรวจจับมือ Hand Detection (Python)
+รันจาก Root ด้วยคำสั่ง:
 ```bash
 python hand/main.py
 ```
