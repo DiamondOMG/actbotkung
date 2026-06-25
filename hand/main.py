@@ -1,6 +1,7 @@
 import cv2
 import mediapipe as mp
 import pyautogui
+pyautogui.FAILSAFE = False
 import numpy as np
 import math
 import time
@@ -50,7 +51,7 @@ THUMBS_UP_HOLD_SEC = 2.0
 TOGGLE_COOLDOWN_SEC = 5.0
 toggle_cooldown_until = 0
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture("http://localhost:5000/api/video_feed")
 cap.set(3, cam_width)
 cap.set(4, cam_height)
 

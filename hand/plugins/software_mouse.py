@@ -5,6 +5,7 @@ import pyautogui
 from .base_mouse import BaseMouse
 
 pyautogui.PAUSE = 0
+pyautogui.FAILSAFE = False
 
 
 class SoftwareMouse(BaseMouse):

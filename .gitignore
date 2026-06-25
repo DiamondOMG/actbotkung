@@ -1,1 +1,3 @@
 /logitech-meeting-camera/venv
+/.env
+/camera-streamer/venv
