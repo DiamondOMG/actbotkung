@@ -18,5 +18,5 @@
   - [x] ปรับสคริปต์ตรวจจับมือให้ดึงข้อมูลภาพจาก API แทนต่อตรงกล้อง
   - [x] ลบโฟลเดอร์เก่า `logitech-meeting-camera`
 - **เฟส 2: Bluetooth Integration**
-  - [ ] พัฒนาโมดูล `bluetooth-controller` บน PC (Python service)
-  - [ ] ส่งคำสั่งควบคุมทีวีผ่าน USB Serial ไปยัง ESP32-C3
+  - [x] พัฒนาโมดูล `bluetooth-controller` บน PC (Python service)
+  - [x] ส่งคำสั่งควบคุมทีวีผ่าน USB Serial ไปยัง ESP32-C3

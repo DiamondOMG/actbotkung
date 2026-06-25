@@ -1,44 +1,37 @@
 # Jarvis Project
 
-โปรเจค Jarvis ที่สร้างขึ้นเพื่อเป็นตัวกลางในการควบคุมโปรแกรมและอุปกรณ์ต่างๆ โดยใช้ AI ในการประมวลผลคำสั่ง รับ Input ได้หลากหลาย (Chat, SSH, Camera, Microphone)
+ระบบผู้ช่วยอัจฉริยะ (Jarvis Workspace Assistant) โครงสร้างแบบ Core Brain + Microservices
 
-## โครงสร้างระบบ
-- **Core Brain**: เลือกใช้รูปแบบ Core Brain (Next.js/Gemini Live + Hermes) + Microservices
-- **Camera Streamer**: Flask Server (พอร์ต 5000) ดึงภาพกล้อง Logitech MeetUp และส่งภาพผ่าน REST API
-- **Hand Detection**: ประมวลผลภาพจากตัวสตรีมเพื่อตรวจจับท่าทางมือ
-
-## เทคโนโลยีและการตั้งค่าเครื่อง
-- **API Cloud**: ใช้การดึง API จาก Cloud ทั้งหมด (Gemini + Nous Portal) เนื่องจากเซิร์ฟเวอร์หลัก (DIGITAL00) ไม่มี GPU แยก การรันบน Cloud จะลื่นที่สุด
+## โครงสร้างโปรเจคและ Microservices
+- `web-speaker/` - [Core Brain Web UI (Next.js)](./web-speaker/README.md)
+- `camera-streamer/` - [MeetUp Camera Streaming API (Python Flask)](./camera-streamer/README.md)
+- `hand/` - [Hand Gesture Mouse Control (Python Mediapipe)](./hand/README.md)
+- `bluetooth-controller/` - [Bluetooth Remote Control (Python Flask & ESP32-C3)](./bluetooth-controller/README.md)
 
 ---
 
-## ขั้นตอนการติดตั้งและการใช้งานจาก Root Folder (ไม่ต้อง cd)
+## วิธีการเริ่มต้นรันระบบอย่างรวดเร็ว (Quick Start)
 
-### 1. บริการ Web Speaker (Next.js)
-ติดตั้งและรันจาก Root ด้วยคำสั่ง:
+กรุณาเปิด Git Bash และรันคำสั่งแยกในแต่ละหน้าต่าง (จาก Root Folder) ดังนี้:
+
+### 1. รัน Core Brain Web UI
 ```bash
-# ติดตั้ง dependencies
-pnpm --prefix web-speaker install
-
-# รันโหมดพัฒนา (Development)
 pnpm --prefix web-speaker dev
 ```
 
-### 2. บริการ Camera Streamer (Python Flask)
-ติดตั้ง dependencies และรันจาก Root ด้วยคำสั่ง:
+### 2. รัน Camera Streamer
 ```bash
-# สร้าง virtual environment (ถ้ายังไม่มี)
-python -m venv camera-streamer/venv
-
-# ติดตั้ง dependencies
-camera-streamer/venv/Scripts/pip install -r camera-streamer/requirements.txt
-
-# รัน Flask Service (รันบนพอร์ต 5000)
 camera-streamer/venv/Scripts/python camera-streamer/main.py
 ```
 
-### 3. บริการตรวจจับมือ Hand Detection (Python)
-รันจาก Root ด้วยคำสั่ง:
+### 3. รัน Bluetooth Controller
+```bash
+bluetooth-controller/venv/Scripts/python bluetooth-controller/main.py
+```
+
+### 4. รัน Hand Mouse Control
 ```bash
 python hand/main.py
 ```
+
+สำหรับรายละเอียดการติดตั้งและการดีบั๊กเฉพาะส่วน กรุณาเปิดอ่านไฟล์ `README.md` ในโฟลเดอร์ของแต่ละโมดูลย่อย
