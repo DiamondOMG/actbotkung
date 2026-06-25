@@ -54,10 +54,25 @@ connect_serial()
 @app.route('/api/status', methods=['GET'])
 def get_status():
     is_connected = ser is not None and ser.is_open
+    ble_status = "unknown"
+    
+    if is_connected:
+        try:
+            ser.reset_input_buffer()
+            ser.write(b"STATUS\n")
+            time.sleep(0.3)
+            while ser.in_waiting:
+                line = ser.readline().decode('utf-8', errors='ignore').strip()
+                if line.startswith("BLE_STATUS:"):
+                    ble_status = line.split(":")[1]
+        except Exception as e:
+            logging.error(f"ไม่สามารถอ่านสถานะ BLE ได้: {e}")
+
     return jsonify({
         "status": "success",
         "serial_connected": is_connected,
-        "port": connected_port
+        "port": connected_port,
+        "ble_status": ble_status
     })
 
 @app.route('/api/tv', methods=['POST'])

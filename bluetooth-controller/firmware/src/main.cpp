@@ -11,11 +11,27 @@ void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH); // Turn off LED initially (Active Low)
+  delay(3000);
 
-  Serial.println("Starting NimBLE Combo Device (Mouse & Keyboard)...");
+  Serial.println("Starting NimBLE Combo Device (Mouse & Keyboard)");
+
+  // กะพริบไฟ 3 ครั้งบ่งบอกสถานะเริ่มต้นการบูต
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(LED_PIN, LOW); delay(100);
+    digitalWrite(LED_PIN, HIGH); delay(100);
+  }
+
   bleKeyboard.begin();
   // bleMouse ไม่ต้องเรียก begin() แยกต่างหากเพราะแชร์ connection ร่วมกับ bleKeyboard
+
+  Serial.println("BLE Setup Complete!");
+
+  // เปิดไฟค้าง 1 วินาทีบอกสถานะว่า BLE เริ่มต้นเสร็จสิ้นโดยไม่ค้าง
+  digitalWrite(LED_PIN, LOW);
+  delay(1000);
+  digitalWrite(LED_PIN, HIGH);
 }
+
 
 void blinkLED(int duration_ms) {
   digitalWrite(LED_PIN, LOW); // Turn on
@@ -60,6 +76,12 @@ void processCommand(String command) {
       bleMouse.click(MOUSE_LEFT);
       Serial.println("Executing TV Click");
     }
+    else if (action == "disconnect") {
+      bleKeyboard.end(); // ปิดสแต็กเพื่อสั่งตัดการเชื่อมต่อทันที
+      delay(500);
+      bleKeyboard.begin(); // เปิดสแต็กใหม่เพื่อรอรับการเชื่อมต่อรอบใหม่
+      Serial.println("Executing BLE Disconnect");
+    }
   }
   // --- [หมวดจำลอง BLE Mouse ขยับเมาส์ระยะไกล] ---
   else if (command.startsWith("BLE_MOUSE:")) {
@@ -88,6 +110,11 @@ void processCommand(String command) {
       bleMouse.click(MOUSE_RIGHT);
       Serial.println("BLE Mouse Click Right");
     }
+  }
+  // --- [คำสั่งเช็คสถานะ BLE] ---
+  else if (command == "STATUS") {
+    bool ble_connected = bleKeyboard.isConnected();
+    Serial.printf("BLE_STATUS:%s\n", ble_connected ? "connected" : "disconnected");
   }
   else {
     Serial.println("Unknown command pattern.");
