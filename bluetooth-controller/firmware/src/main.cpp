@@ -1,144 +1,84 @@
 #include <Arduino.h>
-#include <BleCombo.h>
+#include <BleMouse.h>
 
-#define LED_PIN 8 // Onboard LED of ESP32-C3 Super Mini (Active Low)
+BleMouse ble_mouse("ACTBOTKUNG", " Espressif", 100);
 
-// สร้าง Instance ของ Keyboard และ Mouse โดยแชร์ BLE Connection เดียวกันผ่าน NimBLE
-BleComboKeyboard bleKeyboard("ActbotKung BLE", "OMG", 100);
-BleComboMouse bleMouse(&bleKeyboard);
+void process_command(String command_str) {
+    if (!ble_mouse.isConnected()) {
+        Serial.println("ERR: Bluetooth is not connected yet.");
+        return;
+    }
+
+    char command_type = command_str.charAt(0);
+    char dummy_char, button_char;
+    int mouse_x, mouse_y, scroll_wheel;
+
+    switch (command_type) {
+        case 'M':
+        case 'm':
+            if (sscanf(command_str.c_str(), "%c %d %d", &dummy_char, &mouse_x, &mouse_y) == 3) {
+                ble_mouse.move(mouse_x, mouse_y);
+                Serial.printf("OK: Moved X:%d Y:%d\n", mouse_x, mouse_y);
+            } else {
+                Serial.println("ERR: Invalid Move format. Use: M <x> <y>");
+            }
+            break;
+
+        case 'C':
+        case 'c':
+            if (sscanf(command_str.c_str(), "%c %c", &dummy_char, &button_char) == 2) {
+                if (button_char == 'L' || button_char == 'l') { ble_mouse.click(MOUSE_LEFT); Serial.println("OK: Click Left"); }
+                else if (button_char == 'R' || button_char == 'r') { ble_mouse.click(MOUSE_RIGHT); Serial.println("OK: Click Right"); }
+                else if (button_char == 'M' || button_char == 'm') { ble_mouse.click(MOUSE_MIDDLE); Serial.println("OK: Click Middle"); }
+                else { Serial.println("ERR: Invalid button. Use L, R, or M"); }
+            }
+            break;
+
+        case 'S':
+        case 's':
+            if (sscanf(command_str.c_str(), "%c %d", &dummy_char, &scroll_wheel) == 2) {
+                ble_mouse.move(0, 0, scroll_wheel);
+                Serial.printf("OK: Scrolled %d\n", scroll_wheel);
+            }
+            break;
+            
+        case 'P':
+        case 'p':
+            if (sscanf(command_str.c_str(), "%c %c", &dummy_char, &button_char) == 2) {
+                if (button_char == 'L' || button_char == 'l') { ble_mouse.press(MOUSE_LEFT); Serial.println("OK: Press Left"); }
+                else if (button_char == 'R' || button_char == 'r') { ble_mouse.press(MOUSE_RIGHT); Serial.println("OK: Press Right"); }
+            }
+            break;
+            
+        case 'R':
+        case 'r':
+            if (sscanf(command_str.c_str(), "%c %c", &dummy_char, &button_char) == 2) {
+                if (button_char == 'L' || button_char == 'l') { ble_mouse.release(MOUSE_LEFT); Serial.println("OK: Release Left"); }
+                else if (button_char == 'R' || button_char == 'r') { ble_mouse.release(MOUSE_RIGHT); Serial.println("OK: Release Right"); }
+            }
+            break;
+
+        default:
+            Serial.println("ERR: Unknown command");
+            break;
+    }
+}
 
 void setup() {
-  Serial.begin(115200);
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, HIGH); // Turn off LED initially (Active Low)
-  delay(3000);
-
-  Serial.println("Starting NimBLE Combo Device (Mouse & Keyboard)");
-
-  // กะพริบไฟ 3 ครั้งบ่งบอกสถานะเริ่มต้นการบูต
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(LED_PIN, LOW); delay(100);
-    digitalWrite(LED_PIN, HIGH); delay(100);
-  }
-
-  bleKeyboard.begin();
-  // bleMouse ไม่ต้องเรียก begin() แยกต่างหากเพราะแชร์ connection ร่วมกับ bleKeyboard
-
-  Serial.println("BLE Setup Complete!");
-
-  // เปิดไฟค้าง 1 วินาทีบอกสถานะว่า BLE เริ่มต้นเสร็จสิ้นโดยไม่ค้าง
-  digitalWrite(LED_PIN, LOW);
-  delay(1000);
-  digitalWrite(LED_PIN, HIGH);
-}
-
-
-void blinkLED(int duration_ms) {
-  digitalWrite(LED_PIN, LOW); // Turn on
-  delay(duration_ms);
-  digitalWrite(LED_PIN, HIGH); // Turn off
-}
-
-void processCommand(String command) {
-  command.trim();
-  if (command.length() == 0) return;
-
-  Serial.print("Received command: ");
-  Serial.println(command);
-  blinkLED(50); // Flash LED on command receipt
-
-  bool connected = bleKeyboard.isConnected();
-
-  // --- [หมวดควบคุม TV ผ่าน BLE Mouse/Keyboard จำลอง] ---
-  if (command.startsWith("TV:")) {
-    String action = command.substring(3);
-    if (!connected) {
-      Serial.println("Error: BLE not connected!");
-      return;
-    }
-
-    if (action == "power") {
-      Serial.println("Executing TV Power command");
-    } 
-    else if (action == "volume_up") {
-      bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
-      Serial.println("Executing TV Volume Up");
-    } 
-    else if (action == "volume_down") {
-      bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
-      Serial.println("Executing TV Volume Down");
-    }
-    else if (action == "mute") {
-      bleKeyboard.write(KEY_MEDIA_MUTE);
-      Serial.println("Executing TV Mute");
-    }
-    else if (action == "click") {
-      bleMouse.click(MOUSE_LEFT);
-      Serial.println("Executing TV Click");
-    }
-    else if (action == "disconnect") {
-      bleKeyboard.end(); // ปิดสแต็กเพื่อสั่งตัดการเชื่อมต่อทันที
-      delay(500);
-      bleKeyboard.begin(); // เปิดสแต็กใหม่เพื่อรอรับการเชื่อมต่อรอบใหม่
-      Serial.println("Executing BLE Disconnect");
-    }
-  }
-  // --- [หมวดจำลอง BLE Mouse ขยับเมาส์ระยะไกล] ---
-  else if (command.startsWith("BLE_MOUSE:")) {
-    if (!connected) {
-      Serial.println("Error: BLE not connected!");
-      return;
-    }
+    Serial.begin(115200);
+    delay(6000); // ⚠️ บังคับ delay ไว้เผื่อเวลา flash_monitor
     
-    String action = command.substring(10);
-    if (action.startsWith("move,")) {
-      // รูปแบบ: BLE_MOUSE:move,x,y (เช่น BLE_MOUSE:move,10,-5)
-      String coords = action.substring(5); // ตัด "move,"
-      int commaPos = coords.indexOf(',');
-      if (commaPos != -1) {
-        int x_val = coords.substring(0, commaPos).toInt();
-        int y_val = coords.substring(commaPos + 1).toInt();
-        bleMouse.move(x_val, y_val);
-        Serial.printf("BLE Mouse Move: %d, %d\n", x_val, y_val);
-      }
-    } 
-    else if (action == "click") {
-      bleMouse.click(MOUSE_LEFT);
-      Serial.println("BLE Mouse Click Left");
-    } 
-    else if (action == "right_click") {
-      bleMouse.click(MOUSE_RIGHT);
-      Serial.println("BLE Mouse Click Right");
-    }
-  }
-  // --- [คำสั่งเช็คสถานะ BLE] ---
-  else if (command == "STATUS") {
-    bool ble_connected = bleKeyboard.isConnected();
-    Serial.printf("BLE_STATUS:%s\n", ble_connected ? "connected" : "disconnected");
-  }
-  else {
-    Serial.println("Unknown command pattern.");
-  }
+    Serial.println("Starting BLE Mouse2");
+    ble_mouse.begin();
+    Serial.println("Waiting for Bluetooth connection...");
 }
 
 void loop() {
-  static unsigned long last_check = 0;
-  bool connected = bleKeyboard.isConnected();
-
-  if (millis() - last_check > 2000) {
-    last_check = millis();
-    if (!connected) {
-      // กะพริบสั้นๆ แสดงสถานะรอเชื่อมต่อ
-      digitalWrite(LED_PIN, LOW); delay(50); digitalWrite(LED_PIN, HIGH); delay(100);
-      digitalWrite(LED_PIN, LOW); delay(50); digitalWrite(LED_PIN, HIGH);
-    } else {
-      // ไฟติดสว่างแสดงสถานะเชื่อมต่อสำเร็จ
-      digitalWrite(LED_PIN, LOW); 
+    if (Serial.available() > 0) {
+        String input_command = Serial.readStringUntil('\n');
+        input_command.trim();
+        if (input_command.length() > 0) {
+            process_command(input_command);
+        }
     }
-  }
-
-  if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n');
-    processCommand(command);
-  }
 }
