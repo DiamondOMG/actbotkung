@@ -23,29 +23,43 @@ export type JarvisStatus = 'idle' | 'listening' | 'thinking' | 'speaking';
 export function useJarvis() {
   const [active, setActive] = useState(false);
   const [status, setStatus] = useState<JarvisStatus>('idle');
+  const [userVolume, setUserVolume] = useState(0);
   const refs = useRef<any>({});
   const speakTimeout = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSpokenTimeRef = useRef<number>(0);
 
   // ค่า timeout (ms) ที่จะรอหลังจาก chunk สุดท้าย ถ้าไม่มี chunk ใหม่มา → ถือว่าจบการพูด
   const SPEAKING_TIMEOUT_MS = 4000; // ปรับได้ 2200–3500 ตามความเหมาะสม
 
-  // Auto-close if listening for too long
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    if (status === 'listening' && active) {
-      timeout = setTimeout(() => {
-        console.log('💤 Auto closing due to inactivity...');
-        if (refs.current.session) {
-          refs.current.stream?.getTracks().forEach((t: any) => t.stop());
-          refs.current.audioCtx?.close();
-          refs.current.session?.close();
-          setActive(false);
-          setStatus('idle');
-        }
-      }, 15000);
+  // ฟังก์ชันรีเซ็ตเวลาสำหรับปิดการทำงานอัตโนมัติ (Inactivity Timeout)
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
     }
-    return () => clearTimeout(timeout);
-  }, [status, active]);
+    
+    // ตั้งเวลาปิด 15 วินาทีหากไม่มีความเคลื่อนไหว (ทั้งคนเงียบและบอทเงียบ)
+    inactivityTimeoutRef.current = setTimeout(() => {
+      console.log('💤 Auto closing due to inactivity...');
+      if (refs.current.session) {
+        refs.current.stream?.getTracks().forEach((t: any) => t.stop());
+        refs.current.audioCtx?.close();
+        refs.current.session?.close();
+      }
+      setActive(false);
+      setStatus('idle');
+      setUserVolume(0);
+    }, 15000);
+  }, []);
+
+  // เคลียร์ Timeout ตอน Unmount
+  useEffect(() => {
+    return () => {
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ส่งข้อความแทนการพูด
   const sendText = useCallback((message: string) => {
@@ -53,22 +67,27 @@ export function useJarvis() {
       console.warn('⚠️ Session not active');
       return;
     }
+    resetInactivityTimer(); // รีเซ็ตเวลา inactivity เมื่อส่งคำสั่งตัวอักษร
     setStatus('thinking');
     refs.current.session.sendClientContent({
       turns: [{ role: 'user', parts: [{ text: message }] }]
     });
     console.log('📝 Text sent:', message);
-  }, []);
+  }, [resetInactivityTimer]);
 
   // ปิด Jarvis (idempotent - ถ้าปิดอยู่แล้วจะไม่ทำอะไร)
   const close = useCallback(() => {
     if (!active) return; // ถ้าปิดอยู่แล้ว ไม่ต้องทำอะไร
     
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
     refs.current.stream?.getTracks().forEach((t: any) => t.stop());
     refs.current.audioCtx?.close();
     refs.current.session?.close();
     setActive(false);
     setStatus('idle');
+    setUserVolume(0);
     if (speakTimeout.current) clearTimeout(speakTimeout.current);
   }, [active]);
 
@@ -149,6 +168,7 @@ export function useJarvis() {
             // ────────────────────────────────────────────────
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData) {
+              resetInactivityTimer(); // รีเซ็ตเวลาปิดตัวเมื่อบอทพูด/ส่งข้อมูลมา
               const float32 = base64ToFloat32(audioData);
               const buffer = audioCtx.createBuffer(1, float32.length, SAMPLE_RATE);
               buffer.copyToChannel(float32 as any, 0);
@@ -179,13 +199,61 @@ export function useJarvis() {
 
       const processor = audioCtx.createScriptProcessor(4096, 1, 1);
       processor.onaudioprocess = (e) => {
+        // 1. ป้องกันการขัดจังหวะ (Interruption Prevention)
+        // ถ้า AI กำลังพูดอยู่ (status === 'speaking') จะข้ามการประมวลผลและไม่ส่งเสียงคนพูดไปขัด
+        if (status === 'speaking') {
+          setUserVolume(0);
+          return;
+        }
+
         const inputData = e.inputBuffer.getChannelData(0);
-        session.sendRealtimeInput({
-          media: {
-            data: floatToBase64PCM(inputData),
-            mimeType: `audio/pcm;rate=${SAMPLE_RATE}`
-          }
-        });
+        
+        // คำนวณระดับความดังเสียงจากไมค์ (RMS)
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) {
+          sum += inputData[i] * inputData[i];
+        }
+        const rms = Math.sqrt(sum / inputData.length);
+        const volume = Math.min(Math.round(rms * 300), 100);
+
+        // 2. ระบบ Noise Gate (ตัวกรองเสียงเบา)
+        // กำหนด Threshold ที่ 0.005 (เสียงพูดปกติจะอยู่ราวๆ 0.01 - 0.1)
+        const NOISE_GATE_THRESHOLD = 0.005;
+        const now = Date.now();
+        let isSpeaking = false;
+
+        if (rms >= NOISE_GATE_THRESHOLD) {
+          isSpeaking = true;
+          lastSpokenTimeRef.current = now;
+        } else if (now - lastSpokenTimeRef.current < 800) {
+          // หน่วงเวลา Hold Time 800ms ป้องกันเสียงขาดตอนระหว่างเว้นวรรคคำพูด
+          isSpeaking = true;
+        }
+
+        if (isSpeaking) {
+          setUserVolume(volume);
+          resetInactivityTimer();
+        } else {
+          setUserVolume(0);
+          return; // ประตูเสียงปิด (เงียบเกินไป) -> ไม่ส่งเสียงไปหา API ประหยัดเน็ตและลดเสียงรบกวน
+        }
+
+        try {
+          session.sendRealtimeInput({
+            media: {
+              data: floatToBase64PCM(inputData),
+              mimeType: `audio/pcm;rate=${SAMPLE_RATE}`
+            }
+          });
+        } catch (err) {
+          console.warn('⚠️ WebSocket disconnected. Stopping microphone processor...');
+          processor.disconnect();
+          stream.getTracks().forEach((t: any) => t.stop());
+          audioCtx.close();
+          setActive(false);
+          setStatus('idle');
+          setUserVolume(0);
+        }
       };
 
       audioCtx.createMediaStreamSource(stream).connect(processor);
@@ -194,12 +262,14 @@ export function useJarvis() {
       refs.current = { stream, audioCtx, session };
       setActive(true);
       setStatus('listening');
+      resetInactivityTimer(); // เริ่มจับเวลานับถอยหลังเมื่อระบบเปิดตัว
     } catch (error) {
       console.error('Failed to start Jarvis:', error);
       setActive(false);
       setStatus('idle');
+      setUserVolume(0);
     }
-  }, [active]);
+  }, [active, resetInactivityTimer]);
 
   // toggle สำหรับ backward compatibility
   const toggle = useCallback(async () => {
@@ -210,5 +280,5 @@ export function useJarvis() {
     }
   }, [active, open, close]);
 
-  return { active, toggle, open, close, sendText, status };
+  return { active, toggle, open, close, sendText, status, userVolume };
 }

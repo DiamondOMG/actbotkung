@@ -4,7 +4,7 @@ import { useJarvis } from '@/hooks/useJarvis';
 import { useTriggerListener } from '@/hooks/useTriggerListener';
 
 export default function Page() {
-  const { active, toggle, open, close, sendText, status } = useJarvis();
+  const { active, toggle, open, close, sendText, status, userVolume } = useJarvis();
 
   // Subscribe to external triggers
   useTriggerListener({
@@ -101,9 +101,28 @@ export default function Page() {
                 />
                 {/* Enhanced waveform bars - more bars, dynamic height */}
                 <div className={`absolute inset-0 flex items-center justify-center gap-[4px] waveform ${status}`}>
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <div key={i} className={`bar bar-${i + 1}`} />
-                  ))}
+                  {Array.from({ length: 12 }).map((_, i) => {
+                    // สร้างความสูงคลื่นให้สมดุล (รูปทรงระฆังคว่ำ: สูงตรงกลาง ต่ำที่ขอบ)
+                    const delayFactor = Math.sin((i / 11) * Math.PI); 
+                    const currentScale = 0.3 + (userVolume / 100) * 3.5 * delayFactor;
+                    
+                    return (
+                      <div 
+                        key={i} 
+                        className={`bar bar-${i + 1}`} 
+                        style={
+                          status === 'listening' && userVolume > 2
+                            ? { 
+                                animation: 'none', 
+                                transform: `scaleY(${currentScale})`,
+                                background: `rgba(255, ${140 + Math.round((userVolume / 100) * 115)}, 0, 0.95)`,
+                                boxShadow: `0 0 ${8 + (userVolume / 100) * 16}px rgba(255, 140, 0, 0.6)`
+                              }
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
                 </div>
               </div>
 
