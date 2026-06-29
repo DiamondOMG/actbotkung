@@ -6,9 +6,45 @@ import numpy as np
 import math
 import time
 import sys
+import threading
 
 # === เลือก Plugin ตรงนี้ ===
 from plugins import SoftwareMouse, BLEMouse
+
+# Class สำหรับอ่านเฟรมล่าสุดแบบเรียลไทม์เพื่อตัดปัญหาดีเลย์สะสม (Buffer Delay) ของ OpenCV
+class LatestFrameReader:
+    def __init__(self, src):
+        self.cap = cv2.VideoCapture(src)
+        self.ret = False
+        self.frame = None
+        self.running = True
+        self.lock = threading.Lock()
+        self.thread = threading.Thread(target=self._reader)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def _reader(self):
+        while self.running:
+            ret, frame = self.cap.read()
+            if ret:
+                with self.lock:
+                    self.frame = frame
+                    self.ret = True
+            else:
+                time.sleep(0.01)
+
+    def read(self):
+        with self.lock:
+            if self.ret:
+                return True, self.frame.copy()
+            return False, None
+
+    def is_opened(self):
+        return self.cap.isOpened()
+
+    def release(self):
+        self.running = False
+        self.cap.release()
 
 if len(sys.argv) > 1 and sys.argv[1].lower() == 'ble':
     port = sys.argv[2] if len(sys.argv) > 2 else None
@@ -51,15 +87,15 @@ THUMBS_UP_HOLD_SEC = 2.0
 TOGGLE_COOLDOWN_SEC = 5.0
 toggle_cooldown_until = 0
 
-cap = cv2.VideoCapture("http://localhost:5000/api/video_feed")
-cap.set(3, cam_width)
-cap.set(4, cam_height)
+cap = LatestFrameReader("http://localhost:5000/api/video_feed")
 
 print("Starting Hand Mouse (Full Camera Mode)... Press 'q' to quit.")
 
-while cap.isOpened():
+while cap.is_opened():
     success, img = cap.read()
-    if not success: break
+    if not success:
+        time.sleep(0.01)
+        continue
 
     img = cv2.flip(img, 1)
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
