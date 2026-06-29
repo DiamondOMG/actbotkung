@@ -1,37 +1,54 @@
-# Jarvis Project
+# Jarvis Project (Core Brain + Microservices)
 
-ระบบผู้ช่วยอัจฉริยะ (Jarvis Workspace Assistant) โครงสร้างแบบ Core Brain + Microservices
-
-## โครงสร้างโปรเจคและ Microservices
-- `web-speaker/` - [Core Brain Web UI (Next.js)](./web-speaker/README.md)
-- `camera-streamer/` - [MeetUp Camera Streaming API (Python Flask)](./camera-streamer/README.md)
-- `hand/` - [Hand Gesture Mouse Control (Python Mediapipe)](./hand/README.md)
-- `bluetooth-controller/` - [Bluetooth Remote Control (Python Flask & ESP32-C3)](./bluetooth-controller/README.md)
+ระบบผู้ช่วยอัจฉริยะแบบแยกส่วน (Core Brain + Microservices) เพื่อประมวลผลคำสั่ง, วิเคราะห์ภาพ/มือ และควบคุมทีวีผ่านสัญญาณบลูทูธ
 
 ---
 
-## วิธีการเริ่มต้นรันระบบอย่างรวดเร็ว (Quick Start)
+## 🛠️ โครงสร้างระบบและโมดูลย่อย
 
-กรุณาเปิด Git Bash และรันคำสั่งแยกในแต่ละหน้าต่าง (จาก Root Folder) ดังนี้:
+*   **`web-speaker/` - [Core Brain Web UI (Next.js)](./web-speaker/README.md) [รันพอร์ต 3000]**
+    *   หน้าจอหลักของจาร์วิส รับคำส่งการด้วยเสียง/ข้อความและเชื่อมต่อ Google Gemini API
+    *   มี API `POST /api/trigger` เพื่อรับคำสั่งปลุก (Wake) หรือสั่งงานจากภายนอก
+*   **`camera-streamer/` - [Logitech MeetUp Camera API (Flask)](./camera-streamer/README.md) [รันพอร์ต 5000]**
+    *   บริการเปิดและแชร์วิดีโอสตรีมภาพสดแบบเรียลไทม์จากกล้องผ่าน MJPEG `/api/video_feed`
+    *   รองรับคำสั่งควบคุมทิศทางกล้อง Pan, Tilt, Zoom (PTZ)
+*   **`hand/` - [Hand Gesture Control (Python MediaPipe)](./hand/README.md)**
+    *   ตรวจจับจุดเชื่อมต่อของมือ (Hand Landmarks) เพื่อจำลองการขยับเมาส์ คลิก และเลื่อนหน้าจอ
+    *   ดึงภาพผ่านสตรีมพอร์ต 5000 (ตัดปัญหาดีเลย์ด้วยระบบ Latest Frame Thread)
+    *   **Async API Mode:** ส่งพิกัดผ่าน HTTP API ไปควบคุมทีวีโดยไม่แย่งพอร์ตบอร์ด
+*   **`bluetooth-controller/` - [Bluetooth Controller (Flask & ESP32-C3)](./bluetooth-controller/README.md) [รันพอร์ต 5001]**
+    *   เซิร์ฟเวอร์หลักที่เชื่อมต่อ USB Serial (เช่น `COM19`) ไปหาบอร์ด ESP32-C3
+    *   **Firmware (BLE Keyboard + Mouse Combo):** บอร์ดทำหน้าที่แปลงคำสั่ง Serial เป็นบลูทูธควบคุมทีวี (มีไฟบอกสถานะและระบบป้องการค้างจากการตัดการเชื่อมต่ออัตโนมัติ)
+
+---
+
+## 🚀 วิธีการเริ่มต้นรันระบบอย่างรวดเร็ว (Quick Start)
+
+กรุณาเปิด Git Bash แยกในแต่ละหน้าต่าง (รันจาก Root Folder) ดังนี้:
 
 ### 1. รัน Core Brain Web UI
 ```bash
 pnpm --prefix web-speaker dev
 ```
 
-### 2. รัน Camera Streamer
+### 2. รัน Camera Streamer (เว็บสตรีมกล้อง)
 ```bash
 camera-streamer/venv/Scripts/python camera-streamer/main.py
 ```
 
-### 3. รัน Bluetooth Controller
+### 3. รัน Bluetooth Controller (ตัวคุยบอร์ด USB)
 ```bash
 bluetooth-controller/venv/Scripts/python bluetooth-controller/main.py
 ```
 
-### 4. รัน Hand Mouse Control
+### 4. รัน Hand Mouse Control (ในโหมด API - แนะนำ)
 ```bash
-python hand/main.py
+python hand/main.py api
 ```
 
-สำหรับรายละเอียดการติดตั้งและการดีบั๊กเฉพาะส่วน กรุณาเปิดอ่านไฟล์ `README.md` ในโฟลเดอร์ของแต่ละโมดูลย่อย
+---
+
+## 📈 สถานะการพัฒนาในปัจจุบัน (Project Status)
+*   **Phase 1: Streaming & Gesture (เสร็จสมบูรณ์):** ดึงภาพเรียลไทม์ผ่านเครือข่ายสำเร็จ ขยับเมาส์ด้วยนิ้วชี้และควบคุมระบบข้ามพอร์ตได้ไม่มีหน่วงสะสม
+*   **Phase 2: Bluetooth & Smart TV (เสร็จสมบูรณ์):** สั่งงานทีวีจริงผ่านบลูทูธของบอร์ด ESP32-C3 ทั้งการเพิ่ม/ลดเสียง และจำลองพิกัดเมาส์ไร้สายผ่าน API แบบรันร่วมกันได้ทุกตัว
+*   **Phase 3: Integration (กำลังดำเนินการ):** การเอาคำสั่งจากเสียงและ Gemini Live มาแปลงเป็นทริกเกอร์สั่งงานแบบเรียลไทม์เข้าหน้าเว็บและ Smart TV

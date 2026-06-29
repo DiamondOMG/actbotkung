@@ -4,7 +4,7 @@
 
 #define LED_PIN 8
 
-BleCombo ble_combo("ACTBOTKUNG", "Espressif", 100);
+BleCombo ble_combo("ACTBOTKUNG2", "Espressif", 100);
 
 bool was_connected = false;
 unsigned long last_blink_time = 0;
