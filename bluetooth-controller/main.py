@@ -132,6 +132,27 @@ def send_raw_command():
                 "message": "ไม่พบพารามิเตอร์ command"
             }), 400
             
+        # เพิ่มประสิทธิภาพ: แยกคำสั่งขยับเมาส์ที่เกิน 127 บนเซิร์ฟเวอร์แทนการยิง HTTP ถี่ๆ
+        if command.startswith('M ') or command.startswith('m '):
+            parts = command.split()
+            if len(parts) == 3:
+                try:
+                    dx = int(parts[1])
+                    dy = int(parts[2])
+                    while dx != 0 or dy != 0:
+                        send_x = max(-127, min(127, dx))
+                        send_y = max(-127, min(127, dy))
+                        payload = f"M {send_x} {send_y}\n"
+                        ser.write(payload.encode('utf-8'))
+                        dx -= send_x
+                        dy -= send_y
+                    return jsonify({
+                        "status": "success",
+                        "sent_command": command
+                    })
+                except ValueError:
+                    pass
+
         payload = f"{command}\n"
         ser.write(payload.encode('utf-8'))
         logging.info(f"ส่งคำสั่งดิบ Serial: {payload.strip()}")

@@ -9,7 +9,7 @@ import sys
 import threading
 
 # === เลือก Plugin ตรงนี้ ===
-from plugins import SoftwareMouse, BLEMouse
+from plugins import SoftwareMouse, BLEMouse, APIMouse
 
 # Class สำหรับอ่านเฟรมล่าสุดแบบเรียลไทม์เพื่อตัดปัญหาดีเลย์สะสม (Buffer Delay) ของ OpenCV
 class LatestFrameReader:
@@ -46,9 +46,16 @@ class LatestFrameReader:
         self.running = False
         self.cap.release()
 
-if len(sys.argv) > 1 and sys.argv[1].lower() == 'ble':
-    port = sys.argv[2] if len(sys.argv) > 2 else None
-    mouse = BLEMouse(port=port)
+if len(sys.argv) > 1:
+    mode = sys.argv[1].lower()
+    if mode == 'ble':
+        port = sys.argv[2] if len(sys.argv) > 2 else None
+        mouse = BLEMouse(port=port)
+    elif mode == 'api':
+        url = sys.argv[2] if len(sys.argv) > 2 else "http://localhost:5001"
+        mouse = APIMouse(api_url=url)
+    else:
+        mouse = SoftwareMouse()
 else:
     mouse = SoftwareMouse()
 
