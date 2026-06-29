@@ -23,4 +23,18 @@ bluetooth-controller/venv/Scripts/python bluetooth-controller/main.py
 - `POST /api/tv` - ส่งคำสั่งควบคุมทีวี (มัลติมีเดีย)
   - Payload: `{"action": "volume_up" | "volume_down" | "mute" | "click"}`
 - `POST /api/send` - ส่งคำสั่งตรงไปยัง ESP32-C3
-  - Payload: `{"command": string}` (เช่น `"BLE_MOUSE:move,x,y"`)
+  - Payload: `{"command": string}` (เช่น `"M 100 0"`)
+
+## ข้อควรระวัง & การแก้ไขปัญหา (Troubleshooting)
+
+### 1. ปัญหาพอร์ต Serial ถูกล็อก (Access is denied / PermissionError)
+พอร์ต Serial (เช่น `COM19`) สามารถเชื่อมต่อได้เพียง **1 โปรแกรมในเวลาเดียวกัน**เท่านั้น:
+*   หากรัน `main.py` แล้วขึ้นข้อผิดพลาด `Access is denied` แสดงว่ามี **PlatformIO Serial Monitor** หรือโปรเซสอื่นเชื่อมต่อค้างอยู่
+*   **วิธีแก้:** ให้ปิดมอนิเตอร์ตัวอื่นก่อน (กด `Ctrl + C` หรือ `Ctrl + ]`) หากยังมีโปรเซสค้างในเบื้องหลัง ให้รันคำสั่งเคลียร์โปรเซสใน Git Bash:
+    ```bash
+    taskkill //F //IM python.exe
+    ```
+
+### 2. บอร์ดรีบูตตัวเองเมื่อเปิด/ปิดการเชื่อมต่อ
+*   เนื่องจากบอร์ดมีวงจร Auto-Reset เมื่อมีการเปิดหรือปิดโปรแกรมเชื่อมต่อ Serial (เช่น ปิดเทอร์มินัลด้วย `Ctrl + C`) บอร์ดจะทำการ Reset ตัวเองและเริ่มทำงานใหม่โดยอัตโนมัติ เป็นเรื่องปกติของฮาร์ดแวร์
+

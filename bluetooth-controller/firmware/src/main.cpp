@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <BleCombo.h>
+#include <BLEDevice.h>
 
 #define LED_PIN 8
 
@@ -128,6 +129,11 @@ void loop() {
         } else {
             Serial.println("BLE_STATUS:disconnected");
             digitalWrite(LED_PIN, HIGH); // LED off
+            
+            // ป้องกันปัญหา Bluedroid stack ค้างด้วยการหน่วงเวลาแล้วสั่งเริ่มโฆษณา (Advertising) ใหม่แบบ Static
+            delay(1000);
+            Serial.println("Restarting BLE advertising...");
+            BLEDevice::startAdvertising();
         }
     }
 
