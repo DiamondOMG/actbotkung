@@ -62,10 +62,9 @@ class BLEMouse(BaseMouse):
         """ส่งคำสั่งไปยัง ESP32"""
         if self.ser and self.ser.is_open:
             self.ser.write((cmd + '\n').encode())
-            # อ่าน response กลับมาแบบไม่บล็อก
-            time.sleep(0.01)
-            while self.ser.in_waiting:
-                self.ser.readline()
+            # อ่านล้างบัฟเฟอร์ขาส่งกลับทันทีแบบ Non-blocking (ไม่ต้องหน่วงเวลา)
+            if self.ser.in_waiting > 0:
+                self.ser.read(self.ser.in_waiting)
         else:
             # Fallback สำหรับ debug โดยไม่ต้องต่อบอร์ด
             pass
