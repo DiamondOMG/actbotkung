@@ -43,17 +43,16 @@ class BLEMouse(BaseMouse):
         """ค้นหาพอร์ตที่น่าจะเป็น ESP32-C3"""
         ports = serial.tools.list_ports.comports()
         
-        # ค้นหาด้วย Keyword ที่เจาะจงสำหรับ ESP32-C3 (Internal USB)
+        # แสดงรายการ COM Port ทั้งหมดเพื่อประโยชน์ในการดีบั๊ก
         for p in ports:
-            # เพิ่ม "USB Serial Device" เพราะเครื่องคุณโชว์ชื่อนี้ครับ
-            if "USB JTAG/serial debug unit" in p.description or "USB Serial Device" in p.description:
-                print(f"  -> Found ESP32-C3 (Match Description): {p.device}")
-                return p.device
-        
-        # ค้นหาด้วย Keyword ทั่วไปถ้าหาแบบเจาะจงไม่เจอ
+            print(f"  [COM Port Info] {p.device} - {p.description}")
+
+        # ค้นหาด้วย Keyword แบบ Case-insensitive และครอบคลุม CH343 / serial
         for p in ports:
-            if "ESP32" in p.description or "CP210" in p.description or "CH340" in p.description:
-                print(f"  -> Found potential ESP device: {p.device} ({p.description})")
+            desc = p.description.lower()
+            if ("usb jtag" in desc or "usb serial" in desc or "esp32" in desc or 
+                "ch340" in desc or "ch343" in desc or "cp210" in desc or "uart" in desc or "serial" in desc):
+                print(f"  -> Found potential ESP32-C3: {p.device} ({p.description})")
                 return p.device
                 
         return None
