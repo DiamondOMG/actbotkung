@@ -57,6 +57,8 @@ def main():
     services_dir = os.path.join(project_root, "services")
     if os.path.exists(services_dir):
         for name in os.listdir(services_dir):
+            if name.startswith(".") or name == "__pycache__":
+                continue
             service_path = os.path.join(services_dir, name)
             if os.path.isdir(service_path):
                 setup_python_service(service_path)

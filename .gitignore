@@ -1,8 +1,38 @@
-/services/camera-streamer/venv
-/services/camera-streamer/drivers
-/services/hand-detection/venv
-/services/bluetooth-controller/venv/
-/.env
-/services/bluetooth-controller/firmware/.pio/
-/services/bluetooth-controller/firmware/.vscode/
+# Python virtual environments & packages
+venv/
+.venv/
+/services/*/venv/
+
+# Python cache & compiled files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+build/
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs & System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Firmware compilation caches
+.pio/
+.esphome/
+
+# Specific ignores for project drivers & plugins
+/services/camera-streamer/drivers/
 /services/hand-detection/plugins/
