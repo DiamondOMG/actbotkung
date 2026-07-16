@@ -9,16 +9,17 @@
 *   **`web-speaker/` - [Core Brain Web UI (Next.js)](./web-speaker/README.md) [รันพอร์ต 3000]**
     *   หน้าจอหลักของจาร์วิส รับคำส่งการด้วยเสียง/ข้อความและเชื่อมต่อ Google Gemini API
     *   มี API `POST /api/trigger` เพื่อรับคำสั่งปลุก (Wake) หรือสั่งงานจากภายนอก
-*   **`camera-streamer/` - [Logitech MeetUp Camera API (Flask)](./camera-streamer/README.md) [รันพอร์ต 5000]**
+*   **`services/camera-streamer/` - [Logitech MeetUp Camera API (Flask)](./services/camera-streamer/README.md) [รันพอร์ต 5000]**
     *   บริการเปิดและแชร์วิดีโอสตรีมภาพสดแบบเรียลไทม์จากกล้องผ่าน MJPEG `/api/video_feed`
     *   รองรับคำสั่งควบคุมทิศทางกล้อง Pan, Tilt, Zoom (PTZ)
-*   **`hand/` - [Hand Gesture Control (Python MediaPipe)](./hand/README.md)**
+*   **`services/hand-detection/` - [Hand Gesture Control (Python MediaPipe)](./services/hand-detection/README.md)**
     *   ตรวจจับจุดเชื่อมต่อของมือ (Hand Landmarks) เพื่อจำลองการขยับเมาส์ คลิก และเลื่อนหน้าจอ
     *   ดึงภาพผ่านสตรีมพอร์ต 5000 (ตัดปัญหาดีเลย์ด้วยระบบ Latest Frame Thread)
     *   **Async API Mode:** ส่งพิกัดผ่าน HTTP API ไปควบคุมทีวีโดยไม่แย่งพอร์ตบอร์ด
-*   **`bluetooth-controller/` - [Bluetooth Controller (Flask & ESP32-C3)](./bluetooth-controller/README.md) [รันพอร์ต 5001]**
+*   **`services/bluetooth-controller/` - [Bluetooth Controller (Flask & ESP32-C3)](./services/bluetooth-controller/README.md) [รันพอร์ต 5001]**
     *   เซิร์ฟเวอร์หลักที่เชื่อมต่อ USB Serial (เช่น `COM19`) ไปหาบอร์ด ESP32-C3
     *   **Firmware (BLE Keyboard + Mouse Combo):** บอร์ดทำหน้าที่แปลงคำสั่ง Serial เป็นบลูทูธควบคุมทีวี (มีไฟบอกสถานะและระบบป้องการค้างจากการตัดการเชื่อมต่ออัตโนมัติ)
+*   **`tests/` - สคริปต์สำหรับการทดสอบเชื่อมต่อและความสามารถการทำงาน**
 
 ---
 
@@ -33,17 +34,17 @@ pnpm --prefix web-speaker dev
 
 ### 2. รัน Camera Streamer (เว็บสตรีมกล้อง)
 ```bash
-camera-streamer/venv/Scripts/python camera-streamer/main.py
+services/camera-streamer/venv/Scripts/python services/camera-streamer/main.py
 ```
 
 ### 3. รัน Bluetooth Controller (ตัวคุยบอร์ด USB)
 ```bash
-bluetooth-controller/venv/Scripts/python bluetooth-controller/main.py
+services/bluetooth-controller/venv/Scripts/python services/bluetooth-controller/main.py
 ```
 
 ### 4. รัน Hand Mouse Control (ในโหมด API - แนะนำ)
 ```bash
-python hand/main.py api
+python services/hand-detection/main.py api
 ```
 
 ---

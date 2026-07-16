@@ -1,8 +1,8 @@
-/logitech-meeting-camera/venv
+/services/camera-streamer/venv
+/services/camera-streamer/drivers
+/services/hand-detection/venv
+/services/bluetooth-controller/venv/
 /.env
-/camera-streamer/venv
-
-# bluetooth-controller ignore list
-/bluetooth-controller/venv
-/bluetooth-controller/firmware/.pio/
-/bluetooth-controller/firmware/.vscode/
+/services/bluetooth-controller/firmware/.pio/
+/services/bluetooth-controller/firmware/.vscode/
+/services/hand-detection/plugins/

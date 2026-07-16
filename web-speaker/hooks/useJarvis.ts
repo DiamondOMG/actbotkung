@@ -103,7 +103,7 @@ export function useJarvis() {
       let nextStartTime = 0;
 
       const session = await genAI.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        model: 'gemini-2.5-flash-native-audio-latest',
         config: {
           systemInstruction: { parts: [{ text: instructions.instructions }] },
           responseModalities: [Modality.AUDIO],
