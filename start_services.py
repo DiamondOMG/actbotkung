@@ -6,6 +6,36 @@ import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import services.manage_service as ms
 
+async def monitor_services():
+    """คอยตรวจสอบสถานะของบริการย่อยที่รันอยู่เป็นระยะ และแจ้งเตือนหากมีบริการดับกลางคัน"""
+    last_status = {}
+    services_to_monitor = ["web-speaker", "camera-streamer"]
+    
+    # หน่วงเวลาเริ่มตรวจเช็คครั้งแรก 5 วินาที
+    await asyncio.sleep(5)
+    
+    while True:
+        try:
+            for service_name in services_to_monitor:
+                status = ms.get_service_status(service_name)
+                is_running = status["is_running"]
+                
+                # หากสถานะเปลี่ยนจาก รันอยู่ -> ดับไป
+                if service_name in last_status and last_status[service_name] != is_running:
+                    if not is_running:
+                        print(f"\n⚠️  [ALERT] บริการ '{service_name}' ดับกะทันหัน! (โปรเซสภายนอกถูกปิดลง)")
+                    else:
+                        print(f"\nℹ️  [INFO] บริการ '{service_name}' ได้รับการกู้คืนและเปิดรันอีกครั้ง")
+                
+                # อัปเดตสถานะของบริการ
+                last_status[service_name] = is_running
+                
+            await asyncio.sleep(3)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            await asyncio.sleep(3)
+
 async def main():
     print("🚀 กำลังเริ่มต้นเปิดบริการย่อย Jarvis (Jarvis Bootstrap Services)...")
     print("----------------------------------------------------------------")
@@ -31,6 +61,9 @@ async def main():
     print("✅ บริการทั้งหมดถูกเปิดแยกหน้าต่าง Terminal และเริ่มทำงานแล้ว!")
     print("💡 คุณสามารถกด Ctrl+C ในหน้าต่างนี้เพื่อปิดบริการทั้งหมดพร้อมกัน")
     
+    # เริ่มการรัน Task ตรวจสอบสถานะบริการเบื้องหลัง
+    monitor_task = asyncio.create_task(monitor_services())
+    
     # รันลูปค้างไว้เพื่อเฝ้าดูและรองรับการกด Ctrl+C เพื่อล้างโปรเซสเบื้องหลัง
     try:
         while True:
@@ -38,6 +71,12 @@ async def main():
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
     finally:
+        # สั่งยกเลิกการตรวจเช็คสถานะเบื้องหลัง
+        monitor_task.cancel()
+        try:
+            await monitor_task
+        except asyncio.CancelledError:
+            pass
         # เคลียร์และปิดหน้าต่างเซอร์วิสทั้งหมดที่เปิดไว้เมื่อปิดสคริปต์
         await ms.cleanup_all()
 
@@ -46,4 +85,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n👋 ปิดระบบและบริการย่อยทั้งหมดสำเร็จ.")
+
 

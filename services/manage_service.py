@@ -148,6 +148,13 @@ async def start_service(service_name: str) -> str:
         
         # หน่วงเวลาสั้นๆ รอให้ตัวเซิร์ฟเวอร์เปิดพอร์ตสำเร็จ
         await asyncio.sleep(2.0)
+        
+        # ตรวจสอบว่าโปรเซสสิ้นสุดลงกลางคันหรือไม่ (เช่น เปิดกล้องไม่ได้แล้ว exit(1))
+        exit_code = proc.poll()
+        if exit_code is not None:
+            del running_processes[service_name]
+            return f"Failed to start: process exited with code {exit_code} (โปรเซสหยุดทำงานหลังเริ่มรัน)"
+            
         return f"Successfully started '{service_name}' (PID: {proc.pid})"
         
     except Exception as e:
