@@ -546,6 +546,95 @@ async def execute_tool(name: str, args: dict) -> str:
             except Exception as e:
                 return f"Error: เกิดข้อผิดพลาดในการเชื่อมต่อ TargetR API: {str(e)}"
                 
+        elif name == "trigger_screen_dashboard":
+            screen_target = str(args.get("screen_target", "")).strip()
+            brand = str(args.get("brand", "")).strip().lower()
+            user_confirmed = bool(args.get("user_confirmed", False))
+            
+            if not screen_target or not brand:
+                return "Error: กรุณาระบุชื่อหน้าจอและชื่อแบรนด์ (tops หรือ bigc) ที่ต้องการเปิดมอนิเตอร์"
+                
+            if brand not in ["tops", "tops_digital", "bigc", "big_c"]:
+                return "Error: แบรนด์ที่รองรับคือ 'tops' หรือ 'bigc'"
+                
+            digital_room_screens = {
+                "A4AE125D42DE": "จอ 2 (จอซ้าย)",
+                "A4AE125D4ACC": "จอ 3 (จอขวา)"
+            }
+            
+            target_upper = screen_target.upper()
+            mac_address = None
+            screen_name = screen_target
+            is_digital_room = False
+            
+            if target_upper in ["จอ 2", "จอ2", "จอซ้าย", "2", "LEFT", "A4AE125D42DE"]:
+                mac_address = "A4AE125D42DE"
+                screen_name = digital_room_screens[mac_address]
+                is_digital_room = True
+            elif target_upper in ["จอ 3", "จอ3", "จอขวา", "3", "RIGHT", "A4AE125D4ACC"]:
+                mac_address = "A4AE125D4ACC"
+                screen_name = digital_room_screens[mac_address]
+                is_digital_room = True
+            else:
+                mac_address = target_upper
+                if not is_digital_room and not user_confirmed:
+                    return f"NEED_USER_CONFIRMATION: หน้าจอ '{screen_target}' ({mac_address}) เป็นจอนอกห้อง digital กรุณาถามผู้ใช้เพื่อขอคำยืนยันก่อนดำเนินการยิง Remote Trigger"
+            
+            user = get_env_var("USERNAME_TARGETR")
+            password = get_env_var("PASSWORD_TARGETR")
+            if not user or not password:
+                return "Error: ไม่พบ USERNAME_TARGETR หรือ PASSWORD_TARGETR ใน .env"
+                
+            DASHBOARD_SEQUENCE_ID = "13822E1F644502"
+            sequence_switched = False
+            
+            # Step 1: เช็ค Sequence ID ปัจจุบันของหน้าจอ
+            try:
+                async with httpx.AsyncClient() as client:
+                    check_url = f"https://stacks.targetr.net/rest-api/v1/screens/{mac_address}"
+                    check_res = await client.get(check_url, auth=(user, password), timeout=15.0)
+                    if check_res.status_code == 200:
+                        screen_info = check_res.json()
+                        current_seq = screen_info.get("data", {}).get("sequenceId")
+                        
+                        # Step 2: หากไม่ใช่ Sequence Dashboard ให้สลับ Sequence แล้วหน่วงเวลา 10 วินาที
+                        if current_seq != DASHBOARD_SEQUENCE_ID:
+                            print(f"\n🔄 [Auto Switch Sequence] จอ {screen_name} กำลังเล่น Sequence '{current_seq}' -> สลับเป็น Dashboard ({DASHBOARD_SEQUENCE_ID})...")
+                            bulk_url = "https://stacks.targetr.net/api/bulk-data-update"
+                            bulk_payload = {
+                                "type": "screen",
+                                "ids": [mac_address],
+                                "data": {"sequenceId": DASHBOARD_SEQUENCE_ID}
+                            }
+                            bulk_res = await client.post(bulk_url, json=bulk_payload, auth=(user, password), timeout=15.0)
+                            if bulk_res.status_code == 200:
+                                sequence_switched = True
+                                print("⏳ กำลังหน่วงเวลา 10 วินาที เพื่อให้ Player สลับ Sequence หน้าเว็บ...")
+                                await asyncio.sleep(10)
+            except Exception as e:
+                print(f"⚠️ ไม่สามารถตรวจสอบ Sequence ปัจจุบันได้: {e}")
+            
+            # กำหนดเส้นทาง
+            if brand in ["tops", "tops_digital"]:
+                path_data = "path_/dashboard/tops_digital"
+            else:
+                path_data = "path_/dashboard/bigc"
+                
+            import urllib.parse
+            encoded_trigger = urllib.parse.quote(path_data, safe='')
+            trigger_url = f"https://stacks.targetr.net/api/screen-trigger/{mac_address}?name={encoded_trigger}"
+            
+            try:
+                async with httpx.AsyncClient() as client:
+                    r = await client.get(trigger_url, auth=(user, password), timeout=15.0)
+                    if r.status_code == 200:
+                        extra_msg = " (สลับ Sequence เป็น Dashboard และหน่วงเวลา 10 วินาทีแล้ว)" if sequence_switched else ""
+                        return f"SUCCESS: ส่งคำสั่งเปิดหน้าจอมอนิเตอร์ของ {brand.upper()} บน {screen_name} (MAC: {mac_address}) เรียบร้อยแล้ว{extra_msg} (HTTP 200 via Remote Trigger API)"
+                    else:
+                        return f"Error: ยิง Remote Trigger API ล้มเหลว (HTTP Status: {r.status_code}) - {r.text}"
+            except Exception as e:
+                return f"Error: เกิดข้อผิดพลาดในการเชื่อมต่อ TargetR API: {str(e)}"
+                
     except Exception as e:
         print(f"❌ เกิดข้อผิดพลาดในการรัน Tool {name}: {e}")
         return f"Error (โปรเซสหรือพอร์ตอาจจะปิดอยู่): {str(e)}"
@@ -555,28 +644,16 @@ async def get_completion_with_fallback(messages, tools):
     """ฟังก์ชันสลับ AI Provider อัตโนมัติเมื่อเจอปัญหา Rate Limit หรือ Error (Groq -> DeepSeek -> OpenRouter -> Google Gemini)"""
     providers = [
         {
-            "name": "Groq (Llama 3.3)",
-            "key": get_env_var("GROQ_API_KEY"),
-            "url": "https://api.groq.com/openai/v1/chat/completions",
-            "model": "llama-3.3-70b-versatile"
-        },
-        {
-            "name": "DeepSeek (V3)",
-            "key": get_env_var("DEEPSEEK_API_KEY"),
-            "url": "https://api.deepseek.com/chat/completions",
-            "model": "deepseek-chat"
-        },
-        {
-            "name": "OpenRouter (Free Tier)",
-            "key": get_env_var("OPENROUTER_API_KEY"),
-            "url": "https://openrouter.ai/api/v1/chat/completions",
-            "model": "meta-llama/llama-3.3-70b-instruct:free"
-        },
-        {
             "name": "Google Gemini (2.5 Flash)",
             "key": get_env_var("NEXT_PUBLIC_GEMINI_API_KEY"),
             "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
             "model": "gemini-2.5-flash"
+        },
+        {
+            "name": "Groq (Llama 3.3)",
+            "key": get_env_var("GROQ_API_KEY"),
+            "url": "https://api.groq.com/openai/v1/chat/completions",
+            "model": "llama-3.3-70b-versatile"
         }
     ]
     
@@ -883,7 +960,7 @@ tools = [
                     },
                     "sequence_id": {
                         "type": "string",
-                        "description": "Sequence ID ใหม่ที่ต้องการเปลี่ยนให้หน้าจอเล่น (เช่น '1394D9631B6E41')"
+                        "description": "Sequence ID ใหม่ที่ต้องการเปลี่ยนให้หน้าจอเล่น (หากต้องการเปิด Monitor/สถานะจอออนไลน์ออฟไลน์ ให้ใช้ '13822E1F644502', หากต้องการเปิด Map/แผนที่ ให้ใช้ '130A8573B661A6')"
                     },
                     "user_confirmed": {
                         "type": "boolean",
@@ -918,6 +995,32 @@ tools = [
                 "required": ["screen_target", "store_keyword"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "trigger_screen_dashboard",
+            "description": "เครื่องมือเปิด/เปลี่ยนหน้าจอมอนิเตอร์สรุปสถานะออนไลน์ออฟไลน์ (Monitor Dashboard) สำหรับ Tops หรือ Big C บนหน้าจอแบบเรียลไทม์ (Remote Trigger API)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "screen_target": {
+                        "type": "string",
+                        "description": "ชื่อจอ เช่น 'จอ 2', 'จอซ้าย', 'จอ 3', 'จอขวา' หรือ MAC Address"
+                    },
+                    "brand": {
+                        "type": "string",
+                        "enum": ["tops", "bigc"],
+                        "description": "แบรนด์ที่ต้องการเปิดมอนิเตอร์ (tops = Tops Digital, bigc = Big C)"
+                    },
+                    "user_confirmed": {
+                        "type": "boolean",
+                        "description": "ส่งเป็น true หากเป็นจอนอกห้อง digital และได้รับการยืนยันจากผู้ใช้แล้ว"
+                    }
+                },
+                "required": ["screen_target", "brand"]
+            }
+        }
     }
 ]
 
@@ -927,7 +1030,10 @@ SYSTEM_INSTRUCTION = (
     "## ข้อมูลอุปกรณ์ในห้อง digital\n"
     "- ในห้อง digital มี Smart TV Sharp 2 เครื่อง ติดตั้งแอป dsloader (หรือ TargetR):\n"
     "  1. จอซ้าย (จอ 2): screenId / MAC Address = A4AE125D42DE\n"
-    "  2. จอขวา (จอ 3): screenId / MAC Address = A4AE125D4ACC\n\n"
+    "  2. จอขวา (จอ 3): screenId / MAC Address = A4AE125D4ACC\n"
+    "- ข้อมูล Sequence ID สำคัญของหน้าจอ:\n"
+    "  - หน้าจอมอนิเตอร์สถานะออนไลน์ออฟไลน์ (Monitor): Sequence ID คือ 13822E1F644502\n"
+    "  - หน้าจอแผนที่สาขา (Map): Sequence ID คือ 130A8573B661A6\n\n"
 
     "## กฎสิทธิ์และการควบคุม (Security & Permission Rules)\n"
     "1. สิทธิ์จอบริเวณห้อง digital: จอซ้าย (A4AE125D42DE) และ จอขวา (A4AE125D4ACC) คุณมีสิทธิ์สั่งอัปเดต/เปลี่ยน Sequence ได้ทันทีโดยไม่ต้องรอถามผู้ใช้ยืนยัน\n"
@@ -946,6 +1052,7 @@ SYSTEM_INSTRUCTION = (
 
     "## เครื่องมือที่มี\n"
     "- trigger_screen_map: เครื่องมือเปิด/เปลี่ยนหน้าเว็บแผนที่สาขาห้างบนหน้าจอแบบเรียลไทม์ (Remote Trigger API) พร้อมระบบ Caching ค้นหารายชื่อสาขาอัตโนมัติ\n"
+    "- trigger_screen_dashboard: เครื่องมือเปิด/เปลี่ยนหน้าจอมอนิเตอร์สรุปสถานะออนไลน์ออฟไลน์ (Monitor Dashboard) สำหรับ Tops หรือ Big C บนหน้าจอแบบเรียลไทม์ (Remote Trigger API)\n"
     "- update_screen_sequence: เครื่องมือสำเร็จรูปสำหรับเปลี่ยน Sequence ของหน้าจอ (ใช้ Bulk API ปลอดภัย มีระบบตรวจสิทธิ์จอบริเวณห้อง digital อัตโนมัติ)\n"
     "- call_http_api: ยิง HTTP Request (GET/POST/PUT/DELETE) รองรับ auth แบบ env_basic/env_bearer จาก .env\n"
     "- search_vault_content: ค้นหาคีย์เวิร์ดในถังความจำ Obsidian\n"
